@@ -19,7 +19,7 @@ conn.commit()
 conn.close()
 
 
-@app.route('/executxez',methods=['POST'])
+@app.route('/executxz',methods=['POST'])
 def haha():
    if request.method == 'POST':
      foo = request.form['foo']
