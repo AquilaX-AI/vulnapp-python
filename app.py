@@ -41,7 +41,7 @@ def add_post():
         if request.form['username'] == ADMIN_USERNAME and request.form['password'] == ADMIN_PASSWORD:
             conn = sqlite3.connect('blog.db')
             c = conn.cursor()
-            c.execute("INSERT INTO posts (title, content) VALUES ('" + title + "', '" + content + "')")
+            
             conn.commit()
             conn.close()
             return redirect(url_for('index'))
