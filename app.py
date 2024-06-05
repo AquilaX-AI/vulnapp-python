@@ -11,12 +11,11 @@ import subprocess
 
 @app.route('/')
 def index():
-    conn = sqlite3.connect('glog.db')
+    conn = sqlite3.connect('blog.db')
     c = conn.cursor()
     c.execute('SELECT * FROM posts')
     posts = c.fetchall()
     conn.close()
     return render_template('index.html', posts=posts)
-
 
 
