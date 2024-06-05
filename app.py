@@ -16,6 +16,9 @@ def index():
     c.execute('SELECT * FROM posts')
     posts = c.fetchall()
     conn.close()
-    return render_template('indffex.html', posts=posts)
+    return render_template('index.html', posts=posts)
 
 
+
+if __name__ == '__main__':
+    app.run(debug=True)
