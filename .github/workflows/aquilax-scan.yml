@@ -65,16 +65,18 @@ jobs:
         env:
           AQUILAX_AUTH: ${{ secrets.AQUILAX_API_TOKEN }}
         run: |
-          final_results=$(aquilax get-scan-details \
-            --org-id "6691108b1985981c1f5d5b93" \
-            --group-id "66cc51d790da713a3f7c6075" \
-            --project-id "$PROJECT_ID" \
-            --scan-id "$SCAN_ID")
-          echo "Final Scan Results: $final_results"
-          vulnerabilities_count=$(echo "$final_results" | jq '[.scan.results[] | select(.findings != null) | .findings[]] | length')
-          echo "Number of vulnerabilities found: $vulnerabilities_count"
-          if [ "$vulnerabilities_count" -gt 0 ]; then
-            echo "Vulnerabilities found in the scan results!"
-            exit 1
-          else
-            echo "No vulnerabilities found."
+            final_results=$(aquilax get-scan-details \
+              --org-id "6691108b1985981c1f5d5b93" \
+              --group-id "66cc51d790da713a3f7c6075" \
+              --project-id "$PROJECT_ID" \
+              --scan-id "$SCAN_ID")
+            echo "Final Scan Results: $final_results"
+            vulnerabilities_count=$(echo "$final_results" | jq '[.scan.results[] | select(.findings != null) | .findings[]] | length')
+            echo "Number of vulnerabilities found: $vulnerabilities_count"
+            if [ "$vulnerabilities_count" -gt 0 ]; then
+              echo "Vulnerabilities found in the scan results!"
+              exit 1
+            else
+              echo "No vulnerabilities found."
+            fi
+  
