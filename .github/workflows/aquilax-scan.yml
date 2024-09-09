@@ -71,7 +71,7 @@ jobs:
               echo "Scan completed successfully."
               break
             elif [ "$scan_status" = "FAILED" ]; then
-              echo "Scan failed."
+              echo "::error::Scan failed."
               exit 1
             fi
 
@@ -86,7 +86,7 @@ jobs:
           done
 
           if [ "$scan_status" != "COMPLETED" ]; then
-            echo "Scan did not complete within the expected time frame."
+            echo "::error::Scan did not complete within the expected time frame."
             exit 1
           fi
 
@@ -111,12 +111,12 @@ jobs:
           if [ "$fail_on_vulns" = "true" ]; then
             if [ "$vulnerabilities_count" -gt 0 ]; then
               echo "::error::Vulnerabilities found in the scan results!"
-              exit 1
+              echo "Vulnerabilities found, marking the job as failed."
+              echo "::set-output name=job-status::failure"  # Set job status as failure without exit
             else
               echo "::notice::No vulnerabilities found."
+              echo "::set-output name=job-status::success"
             fi
           else
             echo "::warning::Vulnerabilities found, but pipeline will continue due to 'fail_on_vulns' set to false."
           fi
-
-        continue-on-error: true
