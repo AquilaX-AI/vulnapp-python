@@ -78,7 +78,7 @@ jobs:
             echo "Fetching scan results (Attempt $((attempt+1))/$max_attempts)..."
 
             # Fetch the scan results
-            scan_results=$(aquilax get-scan-results \
+            scan_results=$(aquilax get-scan-details \
               --org-id "6691108b1985981c1f5d5b93" \
               --group-id "66cc51d790da713a3f7c6075" \
               --project-id "$PROJECT_ID" \
