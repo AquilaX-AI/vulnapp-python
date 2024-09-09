@@ -30,7 +30,7 @@ jobs:
         env:
           AQUILAX_AUTH: ${{ secrets.AQUILAX_API_TOKEN }}
         run: |
-          # Run the scan and capture the output
+          # Start the scan and capture the output
           scan_output=$(aquilax scan \
             --org-id "6691108b1985981c1f5d5b93" \
             --group-id "66cc51d790da713a3f7c6075" \
@@ -62,73 +62,59 @@ jobs:
             echo "Raw scan output: $scan_output"
             exit 1
           fi
+
           echo "SCAN_ID=$SCAN_ID" >> $GITHUB_ENV
           echo "PROJECT_ID=$PROJECT_ID" >> $GITHUB_ENV
           echo "Scan started with SCAN_ID=$SCAN_ID and PROJECT_ID=$PROJECT_ID"
 
-      - name: Poll for Scan Completion
+      - name: Poll for Scan Results
         env:
           AQUILAX_AUTH: ${{ secrets.AQUILAX_API_TOKEN }}
         run: |
           max_attempts=40
           attempt=0
-          success=0  # A flag to check for completion
+          success=0  # Flag to indicate if the scan results were successfully retrieved
           while [ $attempt -lt $max_attempts ]; do
-            echo "Polling scan status (Attempt $((attempt+1))/$max_attempts)..."
-            scan_status=$(aquilax get-scan-details \
+            echo "Fetching scan results (Attempt $((attempt+1))/$max_attempts)..."
+
+            # Fetch the scan results
+            scan_results=$(aquilax get-scan-results \
               --org-id "6691108b1985981c1f5d5b93" \
               --group-id "66cc51d790da713a3f7c6075" \
               --project-id "$PROJECT_ID" \
               --scan-id "$SCAN_ID")
 
-            if [ -z "$scan_status" ]; then
-              echo "Failed to retrieve scan status. Retrying..."
+            echo "Raw scan results: $scan_results"
+
+            # Validate if the scan_results is a valid JSON
+            if echo "$scan_results" | jq empty; then
+              echo "Valid JSON detected."
             else
-              echo "Raw scan status: $scan_status"
-
-              status=$(echo "$scan_status" | jq -r '.scan.status')
-              echo "Parsed scan status: $status"
-
-              if [ "$status" = "COMPLETED" ]; then
-                echo "Scan completed!"
-                success=1
-                break
-              elif [ "$status" = "FAILED" ]; then
-                echo "Scan failed!"
-                exit 1
-              fi
+              echo "Invalid JSON detected in scan results. Retrying..."
+              ((attempt++))
+              sleep 5  # Wait for 5 seconds before retrying
+              continue
             fi
 
-            echo "Waiting for 60 seconds before retrying..."
-            sleep 60
+            # Check if scan results contain vulnerabilities
+            vulnerabilities=$(echo "$scan_results" | jq '.scan.results[] | select(.findings != null and .findings | length > 0)')
+
+            if [ -n "$vulnerabilities" ]; then
+              echo "Vulnerabilities found in the scan results:"
+              echo "$vulnerabilities" | jq '.findings[]'
+              exit 1
+            else
+              echo "No vulnerabilities found."
+              success=1
+              break
+            fi
+
+            echo "Waiting for 5 seconds before checking again..."
+            sleep 5
             ((attempt++))
           done
-          
+
           if [ $success -eq 0 ]; then
-            echo "Scan did not complete within the expected time."
+            echo "Failed to retrieve completed scan results within the expected time."
             exit 1
-          fi
-
-      - name: Check for Vulnerabilities
-        env:
-          AQUILAX_AUTH: ${{ secrets.AQUILAX_API_TOKEN }}
-        run: |
-          # Fetch the scan results
-          scan_results=$(aquilax get-scan-results \
-            --org-id "6691108b1985981c1f5d5b93" \
-            --group-id "66cc51d790da713a3f7c6075" \
-            --project-id "$PROJECT_ID" \
-            --scan-id "$SCAN_ID")
-
-          echo "Raw scan results: $scan_results"
-
-          # Check if the scan results contain any vulnerabilities
-          vulnerabilities=$(echo "$scan_results" | jq '.results[] | select(.findings != null) | .findings | length > 0')
-
-          if [ -n "$vulnerabilities" ]; then
-            echo "Vulnerabilities found in the scan results:"
-            echo "$scan_results" | jq '.results[] | select(.findings != null) | .findings[]'
-            exit 1
-          else
-            echo "No vulnerabilities found."
           fi
