@@ -11,6 +11,7 @@ on:
 jobs:
   aquilax_scan:
     runs-on: ubuntu-latest
+    timeout-minutes: 60  # Set timeout to prevent jobs from running indefinitely
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -22,6 +23,7 @@ jobs:
 
       - name: Install Dependencies
         run: |
+          echo "Installing AquilaX CLI and dependencies..."
           pip install aquilax==1.1.10
           sudo apt-get update && sudo apt-get install -y jq
 
@@ -30,6 +32,7 @@ jobs:
         env:
           AQUILAX_AUTH: ${{ secrets.AQUILAX_API_TOKEN }}
         run: |
+          echo "Starting AquilaX Security Scan..."
           scan_output=$(aquilax scan \
             --org-id "6691108b1985981c1f5d5b93" \
             --group-id "66cc51d790da713a3f7c6075" \
@@ -38,6 +41,7 @@ jobs:
             --public true \
             --frequency Once \
             --tags cicd audit)
+          
           echo "Raw Scan Output: $scan_output"
           SCAN_ID=$(echo "$scan_output" | jq -r '.scan_id')
           PROJECT_ID=$(echo "$scan_output" | jq -r '.project_id')
@@ -61,11 +65,14 @@ jobs:
               --scan-id "$SCAN_ID")
 
             scan_status=$(echo "$scan_results" | jq -r '.scan.status')
-            echo "Scan Status: $scan_status"
+            echo "Current Scan Status: $scan_status"
             
             if [ "$scan_status" = "COMPLETED" ]; then
               echo "Scan completed successfully."
               break
+            elif [ "$scan_status" = "FAILED" ]; then
+              echo "Scan failed."
+              exit 1
             fi
 
             # Exponential backoff with a maximum sleep time of 60 seconds
@@ -87,24 +94,28 @@ jobs:
         env:
           AQUILAX_AUTH: ${{ secrets.AQUILAX_API_TOKEN }}
         run: |
+          echo "Fetching final scan results..."
           final_results=$(aquilax get-scan-details \
             --org-id "6691108b1985981c1f5d5b93" \
             --group-id "66cc51d790da713a3f7c6075" \
             --project-id "$PROJECT_ID" \
             --scan-id "$SCAN_ID")
           echo "Final Scan Results: $final_results"
+          
+          # Extracting vulnerabilities count
           vulnerabilities_count=$(echo "$final_results" | jq '[.scan.results[] | select(.findings != null) | .findings[]] | length')
           echo "Number of vulnerabilities found: $vulnerabilities_count"
       
-          fail_on_vulns=false  # Set to false if you don't want the pipeline to fail on vulnerabilities
+          # Fail-on-vulns flag configurable through inputs, default is true
+          fail_on_vulns=true  # Set this to 'false' if you don't want the pipeline to fail on vulnerabilities
 
           if [ "$fail_on_vulns" = "true" ]; then
             if [ "$vulnerabilities_count" -gt 0 ]; then
-              echo "Vulnerabilities found in the scan results!"
+              echo "::error::Vulnerabilities found in the scan results!"
               exit 1
             else
-              echo "No vulnerabilities found."
+              echo "::notice::No vulnerabilities found. Pipeline will continue."
             fi
           else
-            echo "Vulnerabilities found & Completed"
+            echo "::warning::Vulnerabilities found, but pipeline will continue due to 'fail_on_vulns' set to false."
           fi
