@@ -11,7 +11,7 @@ on:
 jobs:
   aquilax_scan:
     runs-on: ubuntu-latest
-    timeout-minutes: 60  # Set timeout to prevent jobs from running indefinitely
+    timeout-minutes: 60
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -106,7 +106,6 @@ jobs:
           vulnerabilities_count=$(echo "$final_results" | jq '[.scan.results[] | select(.findings != null) | .findings[]] | length')
           echo "Number of vulnerabilities found: $vulnerabilities_count"
       
-          # Fail-on-vulns flag configurable through inputs, default is true
           fail_on_vulns=true  # Set this to 'false' if you don't want the pipeline to fail on vulnerabilities
 
           if [ "$fail_on_vulns" = "true" ]; then
@@ -114,8 +113,10 @@ jobs:
               echo "::error::Vulnerabilities found in the scan results!"
               exit 1
             else
-              echo "::notice::No vulnerabilities found. Pipeline will continue."
+              echo "::notice::No vulnerabilities found."
             fi
           else
             echo "::warning::Vulnerabilities found, but pipeline will continue due to 'fail_on_vulns' set to false."
           fi
+
+        continue-on-error: true
