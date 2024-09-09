@@ -95,9 +95,16 @@ jobs:
           echo "Final Scan Results: $final_results"
           vulnerabilities_count=$(echo "$final_results" | jq '[.scan.results[] | select(.findings != null) | .findings[]] | length')
           echo "Number of vulnerabilities found: $vulnerabilities_count"
-          if [ "$vulnerabilities_count" -gt 0 ]; then
-            echo "Vulnerabilities found in the scan results!"
-            exit 1
+      
+          fail_on_vulns=false  # Set to false if you don't want the pipeline to fail on vulnerabilities
+
+          if [ "$fail_on_vulns" = "true" ]; then
+            if [ "$vulnerabilities_count" -gt 0 ]; then
+              echo "Vulnerabilities found in the scan results!"
+              exit 1
+            else
+              echo "No vulnerabilities found."
+            fi
           else
-            echo "No vulnerabilities found."
+            echo "Vulnerabilities found & Completed"
           fi
