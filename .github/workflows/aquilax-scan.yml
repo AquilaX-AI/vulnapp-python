@@ -56,45 +56,48 @@ jobs:
         env:
           AQUILAX_AUTH: ${{ secrets.AQUILAX_API_TOKEN }}
         run: |
-          max_attempts=40
-          attempt=0
-          while [ $attempt -lt $max_attempts ]; do
-            echo "Fetching scan results (Attempt $((attempt+1))/$max_attempts)..."
-            scan_results=$(aquilax get-scan-details \
-              --org-id "6691108b1985981c1f5d5b93" \
-              --group-id "66cc51d790da713a3f7c6075" \
-              --project-id "$PROJECT_ID" \
-              --scan-id "$SCAN_ID")
-            echo "Raw scan results: $scan_results"
-            status=$(echo "$scan_results" | jq -r '.scan.status')
-            echo "Parsed scan status: $status"
-            
-            case "$status" in
-              "COMPLETED")
-                echo "Scan completed successfully!"
-                break
-                ;;
-              "FAILED")
-                echo "Scan failed!"
+           max_attempts=60  # Increased from 40 to 60 to allow more time
+            attempt=0
+            while [ $attempt -lt $max_attempts ]; do
+              echo "Fetching scan results (Attempt $((attempt+1))/$max_attempts)..."
+              scan_results=$(aquilax get-scan-details \
+                --org-id "6691108b1985981c1f5d5b93" \
+                --group-id "66cc51d790da713a3f7c6075" \
+                --project-id "$PROJECT_ID" \
+                --scan-id "$SCAN_ID")
+              echo "Raw scan results: $scan_results"
+              status=$(echo "$scan_results" | jq -r '.scan.status')
+              echo "Parsed scan status: $status"
+  
+              case "$status" in
+                "COMPLETED")
+                  echo "Scan completed successfully!"
+                  break
+                  ;;
+                "FAILED")
+                  echo "Scan failed!"
+                  exit 1
+                  ;;
+                "STARTED"|"InQueue"|"Running"|"NEW")
+                  echo "Scan is still in progress (Status: $status). Waiting for 10 seconds before checking again..."  # Increased sleep time to 10 seconds
+                  sleep 10
+                  ;;
+                *)
+                  echo "Encountered unexpected status: $status. Retrying..."
+                  sleep 10
+                  ;;
+              esac
+              ((attempt++))
+            done
+  
+            if [ $attempt -eq $max_attempts ]; then
+              echo "Final scan status: $status"
+              if [ "$status" != "COMPLETED" ]; then
+                echo "Scan did not complete within the expected time."
                 exit 1
-                ;;
-              "STARTED"|"InQueue"|"Running")
-                echo "Scan is still in progress (Status: $status). Waiting for 5 seconds before checking again..."
-                sleep 5
-                ;;
-              *)
-                echo "Encountered unexpected status: $status. Retrying..."
-                sleep 5
-                ;;
-            esac
-            ((attempt++))
-          done
-          
-          if [ $attempt -eq $max_attempts ] && [ "$status" != "COMPLETED" ]; then
-            echo "Scan did not complete within the expected time."
-            exit 1
-          fi
-
+              fi
+            fi
+  
       - name: Check for Vulnerabilities
         env:
           AQUILAX_AUTH: ${{ secrets.AQUILAX_API_TOKEN }}
