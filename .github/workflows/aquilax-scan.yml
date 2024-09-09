@@ -67,7 +67,7 @@ jobs:
           echo "PROJECT_ID=$PROJECT_ID" >> $GITHUB_ENV
           echo "Scan started with SCAN_ID=$SCAN_ID and PROJECT_ID=$PROJECT_ID"
 
-      - name: Poll for Scan Results
+      - name: Poll for Scan Completion
         env:
           AQUILAX_AUTH: ${{ secrets.AQUILAX_API_TOKEN }}
         run: |
@@ -77,7 +77,7 @@ jobs:
           while [ $attempt -lt $max_attempts ]; do
             echo "Fetching scan results (Attempt $((attempt+1))/$max_attempts)..."
 
-            # Fetch the scan results
+            # Fetch the scan details
             scan_results=$(aquilax get-scan-details \
               --org-id "6691108b1985981c1f5d5b93" \
               --group-id "66cc51d790da713a3f7c6075" \
@@ -96,17 +96,20 @@ jobs:
               continue
             fi
 
-            # Check if scan results contain vulnerabilities
-            vulnerabilities=$(echo "$scan_results" | jq '.scan.results[] | select(.findings != null and .findings | length > 0)')
+            # Check the scan status
+            status=$(echo "$scan_results" | jq -r '.scan.status')
+            echo "Parsed scan status: $status"
 
-            if [ -n "$vulnerabilities" ]; then
-              echo "Vulnerabilities found in the scan results:"
-              echo "$vulnerabilities" | jq '.findings[]'
-              exit 1
-            else
-              echo "No vulnerabilities found."
+            # Continue polling if the scan is not completed and not failed
+            if [[ "$status" == "COMPLETED" ]]; then
+              echo "Scan completed successfully!"
               success=1
               break
+            elif [[ "$status" == "FAILED" ]]; then
+              echo "Scan failed!"
+              exit 1
+            elif [[ "$status" == "NEW" || "$status" == "InQueue" || "$status" == "STARTED" || "$status" == "Running" ]]; then
+              echo "Scan still in progress (Status: $status). Retrying..."
             fi
 
             echo "Waiting for 5 seconds before checking again..."
@@ -115,6 +118,31 @@ jobs:
           done
 
           if [ $success -eq 0 ]; then
-            echo "Failed to retrieve completed scan results within the expected time."
+            echo "Scan did not complete within the expected time."
             exit 1
+
+      - name: Check for Vulnerabilities
+        env:
+          AQUILAX_AUTH: ${{ secrets.AQUILAX_API_TOKEN }}
+        run: |
+          # Fetch the final scan results after completion
+          final_results=$(aquilax get-scan-details \
+            --org-id "6691108b1985981c1f5d5b93" \
+            --group-id "66cc51d790da713a3f7c6075" \
+            --project-id "$PROJECT_ID" \
+            --scan-id "$SCAN_ID")
+
+          echo "Final Scan Results: $final_results"
+
+          # Count the number of vulnerabilities found
+          vulnerabilities_count=$(echo "$final_results" | jq '[.scan.results[] | select(.findings != null) | .findings[]] | length')
+
+          echo "Number of vulnerabilities found: $vulnerabilities_count"
+
+          # Fail the pipeline if any vulnerabilities are found
+          if [ "$vulnerabilities_count" -gt 0 ]; then
+            echo "Vulnerabilities found in the scan results!"
+            exit 1
+          else
+            echo "No vulnerabilities found."
           fi
