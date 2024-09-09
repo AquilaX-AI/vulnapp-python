@@ -42,7 +42,7 @@ jobs:
             --frequency Once \
             --tags cicd audit)
           
-          echo "Raw Scan Output: $scan_output"
+          # echo "Scan :$scan_output"
           SCAN_ID=$(echo "$scan_output" | jq -r '.scan_id')
           PROJECT_ID=$(echo "$scan_output" | jq -r '.project_id')
           echo "Scan started with SCAN_ID=$SCAN_ID and PROJECT_ID=$PROJECT_ID"
@@ -57,7 +57,7 @@ jobs:
           sleep_time=5
           attempt=1
           while [ "$attempt" -le "$max_attempts" ]; do
-            echo "Fetching scan results (Attempt $attempt/$max_attempts)..."
+            echo "Scan results..."
             scan_results=$(aquilax get-scan-details \
               --org-id "6691108b1985981c1f5d5b93" \
               --group-id "66cc51d790da713a3f7c6075" \
@@ -102,9 +102,8 @@ jobs:
             --scan-id "$SCAN_ID")
           # echo "Final Scan Results: $final_results"
           
-          # Extracting vulnerabilities count
           vulnerabilities_count=$(echo "$final_results" | jq '[.scan.results[] | select(.findings != null) | .findings[]] | length')
-          echo "Number of vulnerabilities found: $vulnerabilities_count"
+          echo "::warning::Number of vulnerabilities found: $vulnerabilities_count"
       
           fail_on_vulns=false  # Set this to 'false' if you don't want the pipeline to fail on vulnerabilities
 
