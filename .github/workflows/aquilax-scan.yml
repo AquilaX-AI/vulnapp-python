@@ -49,34 +49,55 @@ jobs:
         env:
           AQUILAX_AUTH: ${{ secrets.AQUILAX_API_TOKEN }}
         run: |
-          attempts=5
-          for (( i=0; i<attempts; i++ )); do
-            echo "Fetching scan results (Attempt $((i+1))/$attempts)..."
+          max_attempts=20
+          sleep_time=5
+          attempt=1
+          while [ "$attempt" -le "$max_attempts" ]; do
+            echo "Fetching scan results (Attempt $attempt/$max_attempts)..."
             scan_results=$(aquilax get-scan-details \
               --org-id "6691108b1985981c1f5d5b93" \
               --group-id "66cc51d790da713a3f7c6075" \
               --project-id "$PROJECT_ID" \
               --scan-id "$SCAN_ID")
-            echo "Raw scan results: $scan_results"
-            sleep 5
+
+            scan_status=$(echo "$scan_results" | jq -r '.scan.status')
+            echo "Scan Status: $scan_status"
+            
+            if [ "$scan_status" = "COMPLETED" ]; then
+              echo "Scan completed successfully."
+              break
+            fi
+
+            # Exponential backoff with a maximum sleep time of 60 seconds
+            sleep "$sleep_time"
+            sleep_time=$((sleep_time * 2))
+            if [ "$sleep_time" -gt 60 ]; then
+              sleep_time=60
+            fi
+
+            attempt=$((attempt + 1))
           done
+
+          if [ "$scan_status" != "COMPLETED" ]; then
+            echo "Scan did not complete within the expected time frame."
+            exit 1
+          fi
 
       - name: Check for Vulnerabilities
         env:
           AQUILAX_AUTH: ${{ secrets.AQUILAX_API_TOKEN }}
         run: |
-            final_results=$(aquilax get-scan-details \
-              --org-id "6691108b1985981c1f5d5b93" \
-              --group-id "66cc51d790da713a3f7c6075" \
-              --project-id "$PROJECT_ID" \
-              --scan-id "$SCAN_ID")
-            echo "Final Scan Results: $final_results"
-            vulnerabilities_count=$(echo "$final_results" | jq '[.scan.results[] | select(.findings != null) | .findings[]] | length')
-            echo "Number of vulnerabilities found: $vulnerabilities_count"
-            if [ "$vulnerabilities_count" -gt 0 ]; then
-              echo "Vulnerabilities found in the scan results!"
-              exit 1
-            else
-              echo "No vulnerabilities found."
-            fi
-  
+          final_results=$(aquilax get-scan-details \
+            --org-id "6691108b1985981c1f5d5b93" \
+            --group-id "66cc51d790da713a3f7c6075" \
+            --project-id "$PROJECT_ID" \
+            --scan-id "$SCAN_ID")
+          echo "Final Scan Results: $final_results"
+          vulnerabilities_count=$(echo "$final_results" | jq '[.scan.results[] | select(.findings != null) | .findings[]] | length')
+          echo "Number of vulnerabilities found: $vulnerabilities_count"
+          if [ "$vulnerabilities_count" -gt 0 ]; then
+            echo "Vulnerabilities found in the scan results!"
+            exit 1
+          else
+            echo "No vulnerabilities found."
+          fi
