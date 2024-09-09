@@ -30,7 +30,6 @@ jobs:
         env:
           AQUILAX_AUTH: ${{ secrets.AQUILAX_API_TOKEN }}
         run: |
-          # Start the scan and capture the output
           scan_output=$(aquilax scan \
             --org-id "6691108b1985981c1f5d5b93" \
             --group-id "66cc51d790da713a3f7c6075" \
@@ -39,30 +38,16 @@ jobs:
             --public true \
             --frequency Once \
             --tags cicd audit)
-
           echo "Raw Scan Output: $scan_output"
-
-          # Remove any potential whitespace from the scan output
           scan_output=$(echo "$scan_output" | tr -d '\n' | tr -d '\r')
-
-          # Validate if the scan_output is a valid JSON
           if echo "$scan_output" | jq empty; then
             echo "Valid JSON detected."
           else
             echo "Invalid JSON detected in scan output."
             exit 1
           fi
-
-          # Parse scan_id and project_id using jq
           SCAN_ID=$(echo "$scan_output" | jq -r '.scan_id')
           PROJECT_ID=$(echo "$scan_output" | jq -r '.project_id')
-
-          if [[ -z "$SCAN_ID" || -z "$PROJECT_ID" ]]; then
-            echo "Failed to extract SCAN_ID or PROJECT_ID"
-            echo "Raw scan output: $scan_output"
-            exit 1
-          fi
-
           echo "SCAN_ID=$SCAN_ID" >> $GITHUB_ENV
           echo "PROJECT_ID=$PROJECT_ID" >> $GITHUB_ENV
           echo "Scan started with SCAN_ID=$SCAN_ID and PROJECT_ID=$PROJECT_ID"
@@ -73,76 +58,46 @@ jobs:
         run: |
           max_attempts=40
           attempt=0
-          success=0  # Flag to indicate if the scan results were successfully retrieved
           while [ $attempt -lt $max_attempts ]; do
             echo "Fetching scan results (Attempt $((attempt+1))/$max_attempts)..."
-
-            # Fetch the scan details
             scan_results=$(aquilax get-scan-details \
               --org-id "6691108b1985981c1f5d5b93" \
               --group-id "66cc51d790da713a3f7c6075" \
               --project-id "$PROJECT_ID" \
               --scan-id "$SCAN_ID")
-
             echo "Raw scan results: $scan_results"
-
-            # Validate if the scan_results is a valid JSON
-            if echo "$scan_results" | jq empty; then
-              echo "Valid JSON detected."
-            else
-              echo "Invalid JSON detected in scan results. Retrying..."
-              ((attempt++))
-              sleep 5  # Wait for 5 seconds before retrying
-              continue
-            fi
-
-            # Check the scan status
             status=$(echo "$scan_results" | jq -r '.scan.status')
             echo "Parsed scan status: $status"
-
-            # Continue polling if the scan is not completed and not failed
             if [[ "$status" == "COMPLETED" ]]; then
               echo "Scan completed successfully!"
-              success=1
               break
             elif [[ "$status" == "FAILED" ]]; then
               echo "Scan failed!"
               exit 1
-            elif [[ "$status" == "NEW" || "$status" == "InQueue" || "$status" == "STARTED" || "$status" == "Running" ]]; then
-              echo "Scan still in progress (Status: $status). Retrying..."
             fi
-
-            echo "Waiting for 5 seconds before checking again..."
+            if [ $attempt -eq $((max_attempts-1)) ]; then
+              echo "Scan did not complete within the expected time."
+              exit 1
+            fi
+            echo "Scan still in progress (Status: $status). Waiting for 5 seconds before checking again..."
             sleep 5
             ((attempt++))
           done
-
-          if [ $success -eq 0 ]; then
-            echo "Scan did not complete within the expected time."
-            exit 1
 
       - name: Check for Vulnerabilities
         env:
           AQUILAX_AUTH: ${{ secrets.AQUILAX_API_TOKEN }}
         run: |
-          # Fetch the final scan results after completion
           final_results=$(aquilax get-scan-details \
             --org-id "6691108b1985981c1f5d5b93" \
             --group-id "66cc51d790da713a3f7c6075" \
             --project-id "$PROJECT_ID" \
             --scan-id "$SCAN_ID")
-
           echo "Final Scan Results: $final_results"
-
-          # Count the number of vulnerabilities found
           vulnerabilities_count=$(echo "$final_results" | jq '[.scan.results[] | select(.findings != null) | .findings[]] | length')
-
           echo "Number of vulnerabilities found: $vulnerabilities_count"
-
-          # Fail the pipeline if any vulnerabilities are found
           if [ "$vulnerabilities_count" -gt 0 ]; then
             echo "Vulnerabilities found in the scan results!"
             exit 1
           else
             echo "No vulnerabilities found."
-          fi
