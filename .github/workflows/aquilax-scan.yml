@@ -68,21 +68,32 @@ jobs:
             echo "Raw scan results: $scan_results"
             status=$(echo "$scan_results" | jq -r '.scan.status')
             echo "Parsed scan status: $status"
-            if [[ "$status" == "COMPLETED" ]]; then
-              echo "Scan completed successfully!"
-              break
-            elif [[ "$status" == "FAILED" ]]; then
-              echo "Scan failed!"
-              exit 1
-            fi
-            if [ $attempt -eq $((max_attempts-1)) ]; then
-              echo "Scan did not complete within the expected time."
-              exit 1
-            fi
-            echo "Scan still in progress (Status: $status). Waiting for 5 seconds before checking again..."
-            sleep 5
+            
+            case "$status" in
+              "COMPLETED")
+                echo "Scan completed successfully!"
+                break
+                ;;
+              "FAILED")
+                echo "Scan failed!"
+                exit 1
+                ;;
+              "STARTED"|"InQueue"|"Running")
+                echo "Scan is still in progress (Status: $status). Waiting for 5 seconds before checking again..."
+                sleep 5
+                ;;
+              *)
+                echo "Encountered unexpected status: $status. Retrying..."
+                sleep 5
+                ;;
+            esac
             ((attempt++))
           done
+          
+          if [ $attempt -eq $max_attempts ] && [ "$status" != "COMPLETED" ]; then
+            echo "Scan did not complete within the expected time."
+            exit 1
+          fi
 
       - name: Check for Vulnerabilities
         env:
