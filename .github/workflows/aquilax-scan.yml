@@ -100,7 +100,7 @@ jobs:
             --group-id "66cc51d790da713a3f7c6075" \
             --project-id "$PROJECT_ID" \
             --scan-id "$SCAN_ID")
-          echo "Final Scan Results: $final_results"
+          # echo "Final Scan Results: $final_results"
           
           # Extracting vulnerabilities count
           vulnerabilities_count=$(echo "$final_results" | jq '[.scan.results[] | select(.findings != null) | .findings[]] | length')
