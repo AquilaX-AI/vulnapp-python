@@ -43,12 +43,22 @@ jq -r '
       }
     ],
     level: (
-      if .severity == "HIGH" or .severity == "ERROR" then "error"
-      elif .severity == "MEDIUM" or .severity == "WARNING" then "warning"
-      elif .severity == "LOW" or .severity == "NOTE" then "note"
+      if .severity == "HIGH" then "error"
+      elif .severity == "MEDIUM" then "warning"
+      elif .severity == "LOW" or .severity == "Unknown" then "note"
       else "none"
       end
-    )
+    ),
+    properties: {
+      vulnerability: .vuln,
+      confidence: .confidence,
+      impact: .impact,
+      likelihood: .likelihood,
+      recommendation: .recommendation,
+      owasp: .owasp,
+      cwe: .cwe,
+      references: .references
+    }
   }' "$input_file" | jq -s '
     {
       "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
