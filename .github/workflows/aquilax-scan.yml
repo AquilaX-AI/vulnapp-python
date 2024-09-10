@@ -8,6 +8,10 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+  security-events: write
+
 jobs:
   aquilax_scan:
     runs-on: ubuntu-latest
@@ -74,7 +78,6 @@ jobs:
               exit 1
             fi
 
-            # Exponential backoff with a maximum sleep time of 60 seconds
             sleep "$sleep_time"
             sleep_time=$((sleep_time * 2))
             if [ "$sleep_time" -gt 60 ]; then
@@ -91,7 +94,7 @@ jobs:
 
       - name: Convert Scan Results to SARIF
         run: |
-          echo "Converting scan results to SARIF format..."
+          echo "Fetching scan results..."
           scan_results=$(aquilax get-scan-details \
             --org-id "6691108b1985981c1f5d5b93" \
             --group-id "66cc51d790da713a3f7c6075" \
@@ -99,6 +102,9 @@ jobs:
             --scan-id "$SCAN_ID")
 
           echo "$scan_results" > scan-results.json
+
+          # Validate the scan results JSON
+          cat scan-results.json | jq . > /dev/null || { echo "Invalid JSON format in scan results"; exit 1; }
 
           bash ./scripts/convert-to-sarif.sh scan-results.json results.sarif
 
@@ -124,7 +130,7 @@ jobs:
           fail_on_vulns=false  # Set this to 'false' if you don't want the pipeline to fail on vulnerabilities
 
           if [ "$fail_on_vulns" = "true" ]; then
-            if [ "$vulnerabilities_count" -gt 0 ];then
+            if [ "$vulnerabilities_count" -gt 0 ]; then
               echo "::error::Vulnerabilities found in the scan results!"
               exit 1
             else
