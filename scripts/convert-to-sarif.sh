@@ -51,18 +51,18 @@ jq -r '
     )
   }' "$input_file" | jq -s '
     {
-      $schema: "https://json.schemastore.org/sarif-2.1.0.json",
-      version: "2.1.0",
-      runs: [
+      "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+      "version": "2.1.0",
+      "runs": [
         {
-          tool: {
-            driver: {
-              name: "Aquilax",
-              informationUri: "https://app.aquilax.ai",
-              rules: []
+          "tool": {
+            "driver": {
+              "name": "Aquilax",
+              "informationUri": "https://app.aquilax.ai",
+              "rules": []
             }
           },
-          results: .
+          "results": .
         }
       ]
     }' > "$output_file"
