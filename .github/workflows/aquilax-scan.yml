@@ -42,7 +42,6 @@ jobs:
             --frequency Once \
             --tags cicd audit)
           
-          # echo "Scan :$scan_output"
           SCAN_ID=$(echo "$scan_output" | jq -r '.scan_id')
           PROJECT_ID=$(echo "$scan_output" | jq -r '.project_id')
           echo "Scan started with SCAN_ID=$SCAN_ID and PROJECT_ID=$PROJECT_ID"
@@ -90,20 +89,20 @@ jobs:
             exit 1
           fi
 
-      - name: Get SARIF Results
-        env:
-          AQUILAX_AUTH: ${{ secrets.AQUILAX_API_TOKEN }}
+      - name: Convert Scan Results to SARIF
         run: |
-          echo "Fetching scan results in SARIF format..."
-          aquilax get-scan-details \
+          echo "Converting scan results to SARIF format..."
+          scan_results=$(aquilax get-scan-details \
             --org-id "6691108b1985981c1f5d5b93" \
             --group-id "66cc51d790da713a3f7c6075" \
             --project-id "$PROJECT_ID" \
-            --scan-id "$SCAN_ID" \
-            --output-format sarif > results.sarif
-          echo "SARIF report generated at results.sarif"
+            --scan-id "$SCAN_ID")
 
-      - name: Upload SARIF to GitHub
+          echo "$scan_results" > scan-results.json
+
+          bash ./scripts/convert-to-sarif.sh scan-results.json results.sarif
+
+      - name: Upload SARIF to GitHub Security
         uses: github/codeql-action/upload-sarif@v2
         with:
           sarif_file: results.sarif
@@ -118,13 +117,14 @@ jobs:
             --group-id "66cc51d790da713a3f7c6075" \
             --project-id "$PROJECT_ID" \
             --scan-id "$SCAN_ID")
+
           vulnerabilities_count=$(echo "$final_results" | jq '[.scan.results[] | select(.findings != null) | .findings[]] | length')
           echo "::warning::Number of vulnerabilities found: $vulnerabilities_count"
       
           fail_on_vulns=false  # Set this to 'false' if you don't want the pipeline to fail on vulnerabilities
 
           if [ "$fail_on_vulns" = "true" ]; then
-            if [ "$vulnerabilities_count" -gt 0 ]; then
+            if [ "$vulnerabilities_count" -gt 0 ];then
               echo "::error::Vulnerabilities found in the scan results!"
               exit 1
             else
