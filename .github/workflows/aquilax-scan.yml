@@ -93,6 +93,8 @@ jobs:
           fi
 
       - name: Convert Scan Results to SARIF
+        env:
+          AQUILAX_AUTH: ${{ secrets.AQUILAX_API_TOKEN }}
         run: |
           echo "Fetching scan results..."
           scan_results=$(aquilax get-scan-details \
