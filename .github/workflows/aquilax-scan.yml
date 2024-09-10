@@ -24,7 +24,7 @@ jobs:
       - name: Install Dependencies
         run: |
           echo "Installing AquilaX CLI and dependencies..."
-          pip install aquilax==1.1.19
+          pip install aquilax
           sudo apt-get update && sudo apt-get install -y jq
 
       - name: Run AquilaX Scan
