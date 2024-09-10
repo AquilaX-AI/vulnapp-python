@@ -90,26 +90,26 @@ jobs:
           if [ "$scan_status" != "COMPLETED" ]; then
             echo "Scan did not complete within the expected time frame."
             exit 1
+          fi
 
       - name: Convert Scan Results to SARIF
         run: |
-          echo "Fetching scan results for conversion..."
+          echo "Fetching scan results..."
           scan_results=$(aquilax get-scan-details \
             --org-id "6691108b1985981c1f5d5b93" \
             --group-id "66cc51d790da713a3f7c6075" \
             --project-id "$PROJECT_ID" \
             --scan-id "$SCAN_ID")
-  
+
           echo "Raw scan results:"
           echo "$scan_results"
-  
-          if echo "$scan_results" | jq . > /dev/null 2>&1; then
-            echo "$scan_results" > scan-results.json
-            echo "Valid JSON scan results. Proceeding with SARIF conversion."
-            bash ./scripts/convert-to-sarif.sh scan-results.json results.sarif
-          else
-            echo "Invalid JSON format in scan results. Exiting."
-            exit 1
+
+          echo "$scan_results" > scan-results.json
+
+          # Validate the scan results JSON
+          cat scan-results.json | jq . > /dev/null || { echo "Invalid JSON format in scan results"; exit 1; }
+
+          bash ./scripts/convert-to-sarif.sh scan-results.json results.sarif
 
       - name: Upload SARIF to GitHub Security
         uses: github/codeql-action/upload-sarif@v2
@@ -130,7 +130,7 @@ jobs:
           vulnerabilities_count=$(echo "$final_results" | jq '[.scan.results[] | select(.findings != null) | .findings[]] | length')
           echo "::warning::Number of vulnerabilities found: $vulnerabilities_count"
       
-          fail_on_vulns=false
+          fail_on_vulns=false  # Set this to 'false' if you don't want the pipeline to fail on vulnerabilities
 
           if [ "$fail_on_vulns" = "true" ]; then
             if [ "$vulnerabilities_count" -gt 0 ]; then
