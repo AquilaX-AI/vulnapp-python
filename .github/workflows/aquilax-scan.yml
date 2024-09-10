@@ -24,7 +24,7 @@ jobs:
       - name: Install Dependencies
         run: |
           echo "Installing AquilaX CLI and dependencies..."
-          pip install aquilax==1.1.10
+          pip install aquilax==1.1.19
           sudo apt-get update && sudo apt-get install -y jq
 
       - name: Run AquilaX Scan
@@ -37,7 +37,7 @@ jobs:
             --org-id "6691108b1985981c1f5d5b93" \
             --group-id "66cc51d790da713a3f7c6075" \
             --git-uri "https://github.com/AquilaX-AI/vulnapp-python" \
-            --scanners sast_scanner iac_scanner secret_scanner pii_scanner sca_scanner container_scanner cicd_scanner\
+            --scanners sast_scanner iac_scanner secret_scanner pii_scanner sca_scanner container_scanner cicd_scanner \
             --public true \
             --frequency Once \
             --tags cicd audit)
@@ -57,7 +57,7 @@ jobs:
           sleep_time=5
           attempt=1
           while [ "$attempt" -le "$max_attempts" ]; do
-            echo "Scan results..."
+            echo "Fetching scan results..."
             scan_results=$(aquilax get-scan-details \
               --org-id "6691108b1985981c1f5d5b93" \
               --group-id "66cc51d790da713a3f7c6075" \
@@ -90,6 +90,24 @@ jobs:
             exit 1
           fi
 
+      - name: Get SARIF Results
+        env:
+          AQUILAX_AUTH: ${{ secrets.AQUILAX_API_TOKEN }}
+        run: |
+          echo "Fetching scan results in SARIF format..."
+          aquilax get-scan-details \
+            --org-id "6691108b1985981c1f5d5b93" \
+            --group-id "66cc51d790da713a3f7c6075" \
+            --project-id "$PROJECT_ID" \
+            --scan-id "$SCAN_ID" \
+            --output-format sarif > results.sarif
+          echo "SARIF report generated at results.sarif"
+
+      - name: Upload SARIF to GitHub
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: results.sarif
+
       - name: Check for Vulnerabilities
         env:
           AQUILAX_AUTH: ${{ secrets.AQUILAX_API_TOKEN }}
@@ -100,8 +118,6 @@ jobs:
             --group-id "66cc51d790da713a3f7c6075" \
             --project-id "$PROJECT_ID" \
             --scan-id "$SCAN_ID")
-          # echo "Final Scan Results: $final_results"
-          
           vulnerabilities_count=$(echo "$final_results" | jq '[.scan.results[] | select(.findings != null) | .findings[]] | length')
           echo "::warning::Number of vulnerabilities found: $vulnerabilities_count"
       
