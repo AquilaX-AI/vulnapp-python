@@ -37,17 +37,17 @@ jobs:
           AQUILAX_AUTH: ${{ secrets.AQUILAX_API_TOKEN }}
         run: |
           echo "Starting AquilaX Security Scan..."
-          scan_output=$(aquilax scan \
+          aquilax scan \
             --org-id "6691108b1985981c1f5d5b93" \
             --group-id "66cc51d790da713a3f7c6075" \
             --git-uri "https://github.com/AquilaX-AI/vulnapp-python" \
             --scanners sast_scanner iac_scanner secret_scanner pii_scanner sca_scanner container_scanner cicd_scanner \
             --public true \
             --frequency Once \
-            --tags cicd audit)
-          
-          SCAN_ID=$(echo "$scan_output" | jq -r '.scan_id')
-          PROJECT_ID=$(echo "$scan_output" | jq -r '.project_id')
+            --tags cicd audit > scan-output.json
+
+          SCAN_ID=$(jq -r '.scan_id' scan-output.json)
+          PROJECT_ID=$(jq -r '.project_id' scan-output.json)
           echo "Scan started with SCAN_ID=$SCAN_ID and PROJECT_ID=$PROJECT_ID"
           echo "SCAN_ID=$SCAN_ID" >> $GITHUB_ENV
           echo "PROJECT_ID=$PROJECT_ID" >> $GITHUB_ENV
@@ -61,13 +61,13 @@ jobs:
           attempt=1
           while [ "$attempt" -le "$max_attempts" ]; do
             echo "Fetching scan results..."
-            scan_results=$(aquilax get-scan-details \
+            aquilax get-scan-details \
               --org-id "6691108b1985981c1f5d5b93" \
               --group-id "66cc51d790da713a3f7c6075" \
               --project-id "$PROJECT_ID" \
-              --scan-id "$SCAN_ID")
+              --scan-id "$SCAN_ID" > scan-results.json
 
-            scan_status=$(echo "$scan_results" | jq -r '.scan.status')
+            scan_status=$(jq -r '.scan.status' scan-results.json)
             echo "Current Scan Status: $scan_status"
             
             if [ "$scan_status" = "COMPLETED" ]; then
@@ -97,21 +97,23 @@ jobs:
           AQUILAX_AUTH: ${{ secrets.AQUILAX_API_TOKEN }}
         run: |
           echo "Fetching scan results..."
-          scan_results=$(aquilax get-scan-details \
+          aquilax get-scan-details \
             --org-id "6691108b1985981c1f5d5b93" \
             --group-id "66cc51d790da713a3f7c6075" \
             --project-id "$PROJECT_ID" \
-            --scan-id "$SCAN_ID")
+            --scan-id "$SCAN_ID" > scan-results.json
 
           echo "Raw scan results:"
-          echo "$scan_results"
-
-          echo "$scan_results" > scan-results.json
+          cat scan-results.json
 
           # Validate the scan results JSON
-          cat scan-results.json | jq . > /dev/null || { echo "Invalid JSON format in scan results"; exit 1; }
-
-          bash ./scripts/convert-to-sarif.sh scan-results.json results.sarif
+          if jq . scan-results.json > /dev/null 2>&1; then
+            echo "Valid JSON scan results. Proceeding with SARIF conversion."
+            bash ./scripts/convert-to-sarif.sh scan-results.json results.sarif
+          else
+            echo "Invalid JSON format in scan results. Exiting."
+            exit 1
+          fi
 
       - name: Upload SARIF to GitHub Security
         uses: github/codeql-action/upload-sarif@v2
@@ -123,16 +125,16 @@ jobs:
           AQUILAX_AUTH: ${{ secrets.AQUILAX_API_TOKEN }}
         run: |
           echo "Fetching final scan results..."
-          final_results=$(aquilax get-scan-details \
+          aquilax get-scan-details \
             --org-id "6691108b1985981c1f5d5b93" \
             --group-id "66cc51d790da713a3f7c6075" \
             --project-id "$PROJECT_ID" \
-            --scan-id "$SCAN_ID")
+            --scan-id "$SCAN_ID" > final-results.json
 
-          vulnerabilities_count=$(echo "$final_results" | jq '[.scan.results[] | select(.findings != null) | .findings[]] | length')
+          vulnerabilities_count=$(jq '[.scan.results[] | select(.findings != null) | .findings[]] | length' final-results.json)
           echo "::warning::Number of vulnerabilities found: $vulnerabilities_count"
       
-          fail_on_vulns=false  # Set this to 'false' if you don't want the pipeline to fail on vulnerabilities
+          fail_on_vulns=false
 
           if [ "$fail_on_vulns" = "true" ]; then
             if [ "$vulnerabilities_count" -gt 0 ]; then
