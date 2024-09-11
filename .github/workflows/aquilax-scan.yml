@@ -44,7 +44,7 @@ jobs:
             --scanners sast_scanner iac_scanner secret_scanner pii_scanner sca_scanner container_scanner cicd_scanner \
             --public true \
             --frequency Once \
-            --tags cicd audit > scan-output.json
+            --tags cicd audit --format json > scan-output.json
 
           SCAN_ID=$(jq -r '.scan_id' scan-output.json)
           PROJECT_ID=$(jq -r '.project_id' scan-output.json)
@@ -66,7 +66,7 @@ jobs:
               --org-id "6691108b1985981c1f5d5b93" \
               --group-id "66cc51d790da713a3f7c6075" \
               --project-id "$PROJECT_ID" \
-              --scan-id "$SCAN_ID" > scan-results.json
+              --scan-id "$SCAN_ID" --format json > scan-results.json
 
             scan_status=$(jq -r '.scan.status' scan-results.json)
             echo "Current Scan Status: $scan_status"
@@ -97,24 +97,15 @@ jobs:
         env:
           AQUILAX_AUTH: ${{ secrets.AQUILAX_API_TOKEN }}
         run: |
-          echo "Fetching scan results for SARIF conversion..."
+          echo "Fetching scan results in SARIF format..."
           aquilax get-scan-details \
             --org-id "6691108b1985981c1f5d5b93" \
             --group-id "66cc51d790da713a3f7c6075" \
             --project-id "$PROJECT_ID" \
-            --scan-id "$SCAN_ID" > scan-results.json
+            --scan-id "$SCAN_ID" --format sarif > results.sarif
 
-          echo "Raw scan results:"
-          cat scan-results.json
-
-          # Validate the scan results JSON before proceeding to SARIF conversion
-          if jq . scan-results.json > /dev/null 2>&1; then
-            echo "Valid JSON scan results. Proceeding with SARIF conversion."
-            bash ./scripts/convert-to-sarif.sh scan-results.json results.sarif
-          else
-            echo "Invalid JSON format in scan results. Exiting."
-            exit 1
-          fi
+          echo "SARIF results:"
+          cat results.sarif
 
       - name: Upload SARIF to GitHub Security
         uses: github/codeql-action/upload-sarif@v2
@@ -130,7 +121,7 @@ jobs:
             --org-id "6691108b1985981c1f5d5b93" \
             --group-id "66cc51d790da713a3f7c6075" \
             --project-id "$PROJECT_ID" \
-            --scan-id "$SCAN_ID" > final-results.json
+            --scan-id "$SCAN_ID" --format json > final-results.json
 
           vulnerabilities_count=$(jq '[.scan.results[] | select(.findings != null) | .findings[]] | length' final-results.json)
           echo "::warning::Number of vulnerabilities found: $vulnerabilities_count"
