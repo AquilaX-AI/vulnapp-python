@@ -104,7 +104,6 @@ jobs:
             --project-id "$PROJECT_ID" \
             --scan-id "$SCAN_ID" --format sarif > results.sarif
 
-          echo "SARIF results:"
           cat results.sarif
 
       - name: Upload SARIF to GitHub Security
@@ -122,6 +121,15 @@ jobs:
             --group-id "66cc51d790da713a3f7c6075" \
             --project-id "$PROJECT_ID" \
             --scan-id "$SCAN_ID" --format json > final-results.json
+
+          vulnerabilities=$(jq -r '.scan.results[] | select(.findings != null) | .findings[] | {type: .type, severity: .severity, description: .description, details_url: "https://app.aquilax.ai/scan-results/" + .finding_id}' final-results.json)
+
+          if [ -z "$vulnerabilities" ]; then
+            echo "No vulnerabilities found."
+          else
+            echo "Vulnerabilities found:"
+            echo "$vulnerabilities" | jq -r '. | "Type: \(.type)\nSeverity: \(.severity)\nDescription: \(.description)\nDetails: \(.details_url)\n---"'
+          fi
 
           vulnerabilities_count=$(jq '[.scan.results[] | select(.findings != null) | .findings[]] | length' final-results.json)
           echo "::warning::Number of vulnerabilities found: $vulnerabilities_count"
