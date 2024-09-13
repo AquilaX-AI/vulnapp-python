@@ -104,8 +104,6 @@ jobs:
             --project-id "$PROJECT_ID" \
             --scan-id "$SCAN_ID" --format sarif > results.sarif
 
-          cat results.sarif
-
       - name: Upload SARIF to GitHub Security
         uses: github/codeql-action/upload-sarif@v2
         with:
@@ -122,15 +120,6 @@ jobs:
             --project-id "$PROJECT_ID" \
             --scan-id "$SCAN_ID" --format json > final-results.json
 
-          vulnerabilities=$(jq -r '.scan.results[] | select(.findings != null) | .findings[] | {type: .type, severity: .severity, description: .description, details_url: "https://app.aquilax.ai/scan-results/" + .finding_id}' final-results.json)
-
-          if [ -z "$vulnerabilities" ]; then
-            echo "No vulnerabilities found."
-          else
-            echo "Vulnerabilities found:"
-            echo "$vulnerabilities" | jq -r '. | "Type: \(.type)\nSeverity: \(.severity)\nDescription: \(.description)\nDetails: \(.details_url)\n---"'
-          fi
-
           vulnerabilities_count=$(jq '[.scan.results[] | select(.findings != null) | .findings[]] | length' final-results.json)
           echo "::warning::Number of vulnerabilities found: $vulnerabilities_count"
       
@@ -146,3 +135,10 @@ jobs:
           else
             echo "::warning::Vulnerabilities found, but pipeline will continue due to 'fail_on_vulns' set to false."
           fi
+
+          # Human-readable output of vulnerabilities
+          aquilax get-scan-details \
+            --org-id "6691108b1985981c1f5d5b93" \
+            --group-id "66cc51d790da713a3f7c6075" \
+            --project-id "$PROJECT_ID" \
+            --scan-id "$SCAN_ID"
