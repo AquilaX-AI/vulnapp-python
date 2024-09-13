@@ -142,4 +142,4 @@ jobs:
             --project-id "$PROJECT_ID" \
             --scan-id "$SCAN_ID"
 
-          echo "::notice::For full vulnerability details, visit https://app.aquilax.ai/scan/$PROJECT_ID/$SCAN_ID"
+          echo "::notice::For full details, visit https://app.aquilax.ai/scans"
