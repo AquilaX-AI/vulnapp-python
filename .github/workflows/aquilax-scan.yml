@@ -136,9 +136,10 @@ jobs:
             echo "::warning::Vulnerabilities found, but pipeline will continue due to 'fail_on_vulns' set to false."
           fi
 
-          # Human-readable output of vulnerabilities
           aquilax get-scan-details \
             --org-id "6691108b1985981c1f5d5b93" \
             --group-id "66cc51d790da713a3f7c6075" \
             --project-id "$PROJECT_ID" \
             --scan-id "$SCAN_ID"
+
+          echo "::notice::For full vulnerability details, visit https://app.aquilax.ai/scan/$PROJECT_ID/$SCAN_ID"
