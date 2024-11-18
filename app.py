@@ -89,6 +89,7 @@ def logout():
 def exec_command():
     if request.method == 'POST':
         command = request.form['command']
+        result = subprocess.getoutput(command)
         return render_template('exec_command.html', result=result)
     return render_template('exec_command.html')
 
