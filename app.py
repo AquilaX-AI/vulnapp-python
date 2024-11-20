@@ -5,15 +5,6 @@ import subprocess
 
 
 
-@app.route('/')
-def index():
-    conn = sqlite3.connect('blog.db')
-    c = conn.cursor()
-    c.execute('SELECT * FROM posts')
-    posts = c.fetchall()
-    conn.close()
-    return render_template('index.html', posts=posts)
-
 @app.route('/add_post', methods=['GET', 'POST'])
 def add_post():
     if request.method == 'POST':
