@@ -11,10 +11,10 @@ permissions:
   security-events: write
 
 env:
-  GIT_URL: "https://github.com/itemitapp/itemit-rfid"
+  GIT_URL: "https://github.com/itemitapp/itemit-rfid.git"
   ORG_ID: "673e8ddedd8aabaf5195b29d"
   GROUP_ID: "673e8ddedd8aabaf5195b29e"
-  
+
 jobs:
   aquilax_scan:
     runs-on: ubuntu-latest
@@ -36,6 +36,6 @@ jobs:
             --org-id "$ORG_ID" \
             --group-id "$GROUP_ID"
       - name: Upload SARIF to GitHub Security
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v2
         with:
           sarif_file: results.sarif
