@@ -1,0 +1,46 @@
+name: AquilaX Security Scan for Redbite
+
+on:
+  push:
+    branches:
+        - main
+        - aquilax
+        - develope 
+
+permissions:
+  contents: read
+  security-events: write
+
+env:
+  ORG_ID: “673e8ddedd8aabaf5195b29d”
+  GROUP_ID: “673e8ddedd8aabaf5195b29e”
+
+jobs:
+  aquilax_scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install AquilaX CLI
+        run: pip install aquilax
+
+      - name: AquilaX CI Scan
+        env:
+          AQUILAX_AUTH: ${{ secrets.AQUILAX_API_TOKEN }}
+        run: |
+          GIT_URL="https://github.com/itemitapp/itemit-rfid"
+          aquilax ci-scan \
+            "$GIT_URL" \
+            --org-id "$ORG_ID" \
+            --group-id "$GROUP_ID"
+
+      - name: Upload SARIF to GitHub Security
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: results.sarif
