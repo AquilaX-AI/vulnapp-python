@@ -1,4 +1,4 @@
-name: AquilaX Security Scan Redbite
+name: AquilaX Security Scan (Redbite)
 
 on:
   push:
