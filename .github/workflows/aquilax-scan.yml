@@ -36,6 +36,7 @@ jobs:
           aquilax ci-scan \
             "$GIT_URL" \
             --org-id "$ORG_ID" \
+            --group-id "$GROUP_ID" \
             --branch ${GITHUB_REF#refs/heads/} \
             --sync
 
