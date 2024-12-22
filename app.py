@@ -38,4 +38,4 @@ def exec_command():
     return render_template('exec_command.html')
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=False)
