@@ -6,7 +6,7 @@ import subprocess
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
 
-# Hardcoded credentials (for demonstration purposes only)
+# Hardcoded credentials (for demonstration purposes only).
 ADMIN_USERNAME = 'admin'
 ADMIN_PASSWORD = '0zu9r2idf9c0tfcc4w26l66ij7visb8q'
 
