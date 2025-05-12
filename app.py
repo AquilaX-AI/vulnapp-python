@@ -10,7 +10,7 @@ app.secret_key = os.urandom(24)
 ADMIN_USERNAME = 'admin'
 ADMIN_PASSWORD = '0zu9r2idf9c0tfcc4w26l66ij7visb8q'
 
-# Initialize the database
+# Initialize the database.
 conn = sqlite3.connect('blog.db')
 c = conn.cursor()
 c.execute('''CREATE TABLE IF NOT EXISTS posts 
