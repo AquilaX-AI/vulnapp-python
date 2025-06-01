@@ -36,8 +36,11 @@ jobs:
             --group-id "${{ vars.AQUILAX_GROUP_ID }}" \
             --branch ${GITHUB_REF#refs/heads/}
 
-      - name: Install AquilaX CLI
-        run: cat results.sarif
+      - name: Validate SARIF file
+        run: |
+          echo "SARIF content:"
+          cat results.sarif
+          jq . results.sarif  # Will fail if not valid JSON
 
       - name: Upload SARIF to GitHub Security
         uses: github/codeql-action/upload-sarif@v3
