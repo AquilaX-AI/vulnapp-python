@@ -23,7 +23,7 @@ jobs:
           python-version: '3.12'
 
       - name: Testin
-        run: echo "$AQUILAX_ORG_ID"
+        run: echo "{{ $AQUILAX_ORG_ID}}"
 
       - name: Install AquilaX CLI
         run: pip install aquilax
