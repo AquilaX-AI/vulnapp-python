@@ -32,8 +32,8 @@ jobs:
           GIT_URL="https://github.com/${{ github.repository }}.git"
           aquilax ci-scan \
             "$GIT_URL" \
-            --org-id "${{ secrets.AQUILAX_ORG_ID }}" \
-            --group-id "${{ secrets.AQUILAX_GROUP_ID }}" \
+            --org-id "${{ env.AQUILAX_ORG_ID }}" \
+            --group-id "${{ env.AQUILAX_GROUP_ID }}" \
             --branch ${GITHUB_REF#refs/heads/}
 
       - name: Upload SARIF to GitHub Security
