@@ -22,9 +22,6 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Testin
-        run: echo "{{ vars.$AQUILAX_ORG_ID}}"
-
       - name: Install AquilaX CLI
         run: pip install aquilax
 
@@ -38,6 +35,9 @@ jobs:
             --org-id "${{ vars.AQUILAX_ORG_ID }}" \
             --group-id "${{ vars.AQUILAX_GROUP_ID }}" \
             --branch ${GITHUB_REF#refs/heads/}
+
+      - name: Install AquilaX CLI
+        run: cat results.sarif
 
       - name: Upload SARIF to GitHub Security
         uses: github/codeql-action/upload-sarif@v3
