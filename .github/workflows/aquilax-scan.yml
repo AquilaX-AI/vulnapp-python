@@ -1,66 +1,50 @@
 name: AquilaX Security Scan
 
-on:
-  push:
-    branches: 
-      - "*"
+on: [push]
 
 permissions:
   contents: read
   security-events: write
 
 jobs:
-  aquilax_scan:
+  scan:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-        
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
         with:
           python-version: '3.12'
-          
-      - name: Install AquilaX CLI
-        run: pip install aquilax
-        
-      - name: AquilaX CI Scan
-        env:
-          AQUILAX_AUTH: ${{ secrets.AQUILAX_API_TOKEN }}
-        run: |
-          GIT_URL="https://github.com/${{ github.repository }}.git"
-          aquilax ci-scan \
-            "$GIT_URL" \
+      - run: pip install aquilax
+      - run: |
+          aquilax ci-scan "https://github.com/${{ github.repository }}.git" \
             --org-id "${{ vars.AQUILAX_ORG_ID }}" \
             --group-id "${{ vars.AQUILAX_GROUP_ID }}" \
             --branch ${GITHUB_REF#refs/heads/}
-            
-      - name: Fix SARIF for GitHub
-        run: |
+        env:
+          AQUILAX_AUTH: ${{ secrets.AQUILAX_API_TOKEN }}
+      - run: |
           python3 -c "
           import json
-          with open('results.sarif', 'r') as f:
-              sarif = json.load(f)
-          for run in sarif.get('runs', []):
-              if 'artifacts' not in run:
-                  run['artifacts'] = []
-              files = set()
-              for result in run.get('results', []):
-                  for loc in result.get('locations', []):
-                      if 'physicalLocation' in loc and 'artifactLocation' in loc['physicalLocation']:
-                          uri = loc['physicalLocation']['artifactLocation'].get('uri', '')
-                          if uri.startswith('/'):
-                              uri = uri[1:]
-                          loc['physicalLocation']['artifactLocation']['uri'] = uri
-                          loc['physicalLocation']['artifactLocation']['uriBaseId'] = '%SRCROOT%'
-                          files.add(uri)
-              for f in files:
-                  run['artifacts'].append({'location': {'uri': f, 'uriBaseId': '%SRCROOT%'}})
-          with open('results.sarif', 'w') as f:
-              json.dump(sarif, f, indent=2)
+          with open('results.sarif') as f: s=json.load(f)
+          for r in s.get('runs',[]):
+           if 'artifacts' not in r: r['artifacts']=[]
+           files=set()
+           for res in r.get('results',[]):
+            for loc in res.get('locations',[]):
+             if 'physicalLocation' in loc:
+              if 'artifactLocation' not in loc['physicalLocation']:
+               loc['physicalLocation']['artifactLocation']={'uri':'app.py','uriBaseId':'%SRCROOT%'}
+               files.add('app.py')
+              else:
+               uri=loc['physicalLocation']['artifactLocation'].get('uri','app.py').lstrip('/')
+               if not uri: uri='app.py'
+               loc['physicalLocation']['artifactLocation']={'uri':uri,'uriBaseId':'%SRCROOT%'}
+               files.add(uri)
+           for f in files:
+            if not any(a.get('location',{}).get('uri')==f for a in r['artifacts']):
+             r['artifacts'].append({'location':{'uri':f,'uriBaseId':'%SRCROOT%'}})
+          with open('results.sarif','w') as f: json.dump(s,f)
           "
-          
-      - name: Upload SARIF to GitHub Security
-        uses: github/codeql-action/upload-sarif@v3
+      - uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: results.sarif
