@@ -35,127 +35,30 @@ jobs:
             --group-id "${{ vars.AQUILAX_GROUP_ID }}" \
             --branch ${GITHUB_REF#refs/heads/}
             
-      - name: Validate SARIF file
+      - name: Fix SARIF for GitHub
         run: |
-          echo "SARIF content:"
-          if [ -f results.sarif ]; then
-            cat results.sarif
-            if jq empty results.sarif; then
-              echo "SARIF is valid JSON"
-            else
-              echo "SARIF is not valid JSON"
-              exit 1
-            fi
-          else
-            echo "results.sarif file not found"
-            exit 1
-          fi
-          
-      - name: Debug and fix SARIF structure
-        run: |
-          echo "=== Original SARIF structure ==="
-          jq '.runs[0] | keys' results.sarif || echo "No runs found"
-          jq '.runs[0].artifacts[0:2]' results.sarif || echo "No artifacts found"
-          jq '.runs[0].results[0].locations[0]' results.sarif || echo "No result locations found"
-          
-          python3 << 'EOF'
+          python3 -c "
           import json
-          import os
-          
           with open('results.sarif', 'r') as f:
-              sarif_data = json.load(f)
-          
-          print("=== Debug Info ===")
-          print(f"SARIF version: {sarif_data.get('version', 'unknown')}")
-          print(f"Number of runs: {len(sarif_data.get('runs', []))}")
-          
-          if 'runs' in sarif_data and len(sarif_data['runs']) > 0:
-              run = sarif_data['runs'][0]
-              print(f"Run keys: {list(run.keys())}")
-              print(f"Number of results: {len(run.get('results', []))}")
-              print(f"Number of artifacts: {len(run.get('artifacts', []))}")
-              
-              if 'results' in run and len(run['results']) > 0:
-                  first_result = run['results'][0]
-                  print(f"First result keys: {list(first_result.keys())}")
-                  if 'locations' in first_result and len(first_result['locations']) > 0:
-                      first_location = first_result['locations'][0]
-                      print(f"First location keys: {list(first_location.keys())}")
-                      if 'physicalLocation' in first_location:
-                          phys_loc = first_location['physicalLocation']
-                          print(f"Physical location keys: {list(phys_loc.keys())}")
-          
-          if 'runs' in sarif_data:
-              for run in sarif_data['runs']:
-                  if 'artifacts' not in run:
-                      run['artifacts'] = []
-                  
-                  file_paths = set()
-                  artifacts_to_add = []
-                  
-                  if 'results' in run:
-                      for result in run['results']:
-                          if 'locations' in result:
-                              for location in result['locations']:
-                                  if 'physicalLocation' in location:
-                                      phys_loc = location['physicalLocation']
-                                      
-                                      if 'artifactLocation' not in phys_loc:
-                                          file_uri = "app.py"
-                                          phys_loc['artifactLocation'] = {
-                                              'uri': file_uri,
-                                              'uriBaseId': '%SRCROOT%'
-                                          }
-                                          file_paths.add(file_uri)
-                                      else:
-                                          artifact_loc = phys_loc['artifactLocation']
-                                          
-                                          if 'uri' not in artifact_loc:
-                                              artifact_loc['uri'] = "app.py"
-                                          
-                                          uri = artifact_loc['uri']
-                                          if uri.startswith('/'):
-                                              uri = uri[1:]
-                                          if not uri:
-                                              uri = "app.py"
-                                          
-                                          artifact_loc['uri'] = uri
-                                          file_paths.add(uri)
-                                          
-                                          if 'uriBaseId' not in artifact_loc:
-                                              artifact_loc['uriBaseId'] = '%SRCROOT%'
-                  
-                  existing_uris = set()
-                  for artifact in run['artifacts']:
-                      if 'location' in artifact and 'uri' in artifact['location']:
-                          existing_uris.add(artifact['location']['uri'])
-                  
-                  for file_path in file_paths:
-                      if file_path not in existing_uris:
-                          run['artifacts'].append({
-                              'location': {
-                                  'uri': file_path,
-                                  'uriBaseId': '%SRCROOT%'
-                              }
-                          })
-                  
-                  if 'tool' not in run:
-                      run['tool'] = {
-                          'driver': {
-                              'name': 'AquilaX',
-                              'version': '1.0.0'
-                          }
-                      }
-          
+              sarif = json.load(f)
+          for run in sarif.get('runs', []):
+              if 'artifacts' not in run:
+                  run['artifacts'] = []
+              files = set()
+              for result in run.get('results', []):
+                  for loc in result.get('locations', []):
+                      if 'physicalLocation' in loc and 'artifactLocation' in loc['physicalLocation']:
+                          uri = loc['physicalLocation']['artifactLocation'].get('uri', '')
+                          if uri.startswith('/'):
+                              uri = uri[1:]
+                          loc['physicalLocation']['artifactLocation']['uri'] = uri
+                          loc['physicalLocation']['artifactLocation']['uriBaseId'] = '%SRCROOT%'
+                          files.add(uri)
+              for f in files:
+                  run['artifacts'].append({'location': {'uri': f, 'uriBaseId': '%SRCROOT%'}})
           with open('results.sarif', 'w') as f:
-              json.dump(sarif_data, f, indent=2)
-          
-          print("=== SARIF file has been fixed ===")
-          EOF
-          
-          echo "=== Fixed SARIF structure ==="
-          jq '.runs[0].artifacts[0:2]' results.sarif || echo "Still no artifacts"
-          jq '.runs[0].results[0].locations[0].physicalLocation.artifactLocation' results.sarif || echo "Still no artifact location"
+              json.dump(sarif, f, indent=2)
+          "
           
       - name: Upload SARIF to GitHub Security
         uses: github/codeql-action/upload-sarif@v3
