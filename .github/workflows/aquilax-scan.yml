@@ -2,13 +2,12 @@ name: AquilaX Security Scan
 
 on:
   push:
-    branches:
+    branches: 
       - "*"
 
 permissions:
   contents: read
   security-events: write
-
 
 jobs:
   aquilax_scan:
@@ -16,15 +15,15 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
-
+        
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.12'
-
+          
       - name: Install AquilaX CLI
         run: pip install aquilax
-
+        
       - name: AquilaX CI Scan
         env:
           AQUILAX_AUTH: ${{ secrets.AQUILAX_API_TOKEN }}
@@ -35,13 +34,83 @@ jobs:
             --org-id "${{ vars.AQUILAX_ORG_ID }}" \
             --group-id "${{ vars.AQUILAX_GROUP_ID }}" \
             --branch ${GITHUB_REF#refs/heads/}
-
+            
       - name: Validate SARIF file
         run: |
           echo "SARIF content:"
-          cat results.sarif
-          jq . results.sarif  # Will fail if not valid JSON
-
+          if [ -f results.sarif ]; then
+            cat results.sarif
+            if jq empty results.sarif; then
+              echo "SARIF is valid JSON"
+            else
+              echo "SARIF is not valid JSON"
+              exit 1
+            fi
+          else
+            echo "results.sarif file not found"
+            exit 1
+          fi
+          
+      - name: Fix SARIF for GitHub compatibility
+        run: |
+          python3 << 'EOF'
+          import json
+          import os
+          
+          with open('results.sarif', 'r') as f:
+              sarif_data = json.load(f)
+          
+          if 'runs' in sarif_data:
+              for run in sarif_data['runs']:
+                  if 'artifacts' not in run:
+                      run['artifacts'] = []
+                  
+                  file_paths = set()
+                  
+                  if 'results' in run:
+                      for result in run['results']:
+                          if 'locations' in result:
+                              for location in result['locations']:
+                                  if 'physicalLocation' in location:
+                                      phys_loc = location['physicalLocation']
+                                      
+                                      if 'artifactLocation' in phys_loc:
+                                          artifact_loc = phys_loc['artifactLocation']
+                                          
+                                          if 'uri' in artifact_loc:
+                                              uri = artifact_loc['uri']
+                                              if uri.startswith('/'):
+                                                  uri = uri[1:]
+                                              artifact_loc['uri'] = uri
+                                              file_paths.add(uri)
+                                          
+                                          if 'uriBaseId' not in artifact_loc:
+                                              artifact_loc['uriBaseId'] = '%SRCROOT%'
+                                      else:
+                                          file_uri = 'unknown'
+                                          phys_loc['artifactLocation'] = {
+                                              'uri': file_uri,
+                                              'uriBaseId': '%SRCROOT%'
+                                          }
+                                          file_paths.add(file_uri)
+                  
+                  existing_artifacts = {artifact.get('location', {}).get('uri') for artifact in run['artifacts']}
+                  
+                  for file_path in file_paths:
+                      if file_path not in existing_artifacts and file_path != 'unknown':
+                          run['artifacts'].append({
+                              'location': {
+                                  'uri': file_path,
+                                  'uriBaseId': '%SRCROOT%'
+                              }
+                          })
+          
+          with open('results.sarif', 'w') as f:
+              json.dump(sarif_data, f, indent=2)
+          
+          print("SARIF file has been fixed for GitHub compatibility")
+          EOF
+          
       - name: Upload SARIF to GitHub Security
         uses: github/codeql-action/upload-sarif@v3
         with:
