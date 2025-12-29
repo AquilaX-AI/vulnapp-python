@@ -1,18 +1,60 @@
 # vulnapp-python
+
 Intentional Vulnerable Python Application - Used only for tests in AquilaX
 
-This application includes the following vulnerabilities:
+## Purpose
 
-- SQL Injection: The /add_post route is vulnerable to SQL injection because it directly inserts user input into an SQL query without proper sanitization.
+This repository serves as a test target for the AquilaX security scanner suite. It contains intentional vulnerabilities and license violations to verify scanner detection capabilities.
 
-- XSS (Cross-Site Scripting): The /view_post/<int:id> route is vulnerable to XSS because it doesn't properly escape or sanitize user input before rendering it in the HTML template.
+---
 
-- Hardcoded Password: The application contains hardcoded admin credentials (ADMIN_USERNAME and ADMIN_PASSWORD), which is a security risk.
+## Security Vulnerabilities
 
-- Path Traversal: The application does not properly sanitize input in the /exec_command route, allowing an attacker to execute arbitrary commands on the server.
+The application includes the following **code-level vulnerabilities**:
 
-- Code Injection: The /exec_command route is vulnerable to code injection because it executes user-supplied input as a command without proper validation.
+| Vulnerability | Location | Description |
+|---------------|----------|-------------|
+| **SQL Injection** | `/add_post` route | User input directly inserted into SQL query without sanitization |
+| **XSS (Cross-Site Scripting)** | `/view_post/<id>` route | User input rendered without proper escaping |
+| **Hardcoded Credentials** | `app.py` | Admin credentials hardcoded in source code |
+| **Path Traversal** | `/exec_command` route | Input not sanitized, allows arbitrary path access |
+| **Code Injection** | `/exec_command` route | Executes user-supplied input as system command |
+| **XSRF** | All forms | No CSRF protection implemented |
 
-- XSRF (Cross-Site Request Forgery): Although not explicitly implemented, the application lacks protection against XSRF attacks, which could allow an attacker to execute unauthorized actions on behalf of a logged-in user.
+---
 
-Please use caution when running and testing this code, and be aware of the potential security risks involved.
+## Docker Container
+
+The `Dockerfile` includes:
+- Python 3.11 slim base image
+- System packages with various licenses (bash, coreutils - GPL)
+- All Python dependencies from `requirements.txt`
+
+---
+
+## Running the Application
+
+```bash
+# Local development
+pip install -r requirements.txt
+python app.py
+
+# Docker
+docker build -t vulnapp-python .
+docker run -p 5000:5000 vulnapp-python
+```
+
+---
+
+## Scanner Testing
+
+Install AquilaX CLI: [Docs](https://docs.aquilax.ai/user-manual/devtools/aquilax-cli#install)
+
+```bash
+# Run AquilaX scan
+aquilax scan https://github.com/AquilaX-AI/vulnapp-python --sync
+```
+
+---
+
+⚠️ **WARNING**: This application is intentionally vulnerable. Do NOT deploy in production environments.
